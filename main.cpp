@@ -84,7 +84,7 @@ int main(int argc, char** argv)
 		for(int r = 0; r < R; r++)
 			MPI_Recv(X[r], N, MPI_INT, 0, r, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-	// -------------- DENOISE --------------
+	// -------------- DENOISE - INITIALIZE VALUES --------------
 
 		int Z[R][N];
 
@@ -92,16 +92,41 @@ int main(int argc, char** argv)
 			for(int c = 0; c < N; c++)
 				Z[r][c] = X[r][c];
 
+		int EXTRA_ROW_ABOVE[N];
+		int EXTRA_ROW_BELOW[N];
+
 		double beta = atof(argv[3]);
 
 		double pi = atof(argv[4]);
 		double gamma = 0.5*log((1-pi)/pi);
 
-		long iteration_limit = 1000000;
+		long iteration_limit = 100000 / S;
 
 		srand(time(NULL));
 
 		for(long iteration_number = 1; iteration_number < iteration_limit; iteration_number++) {
+
+		// -------------- DISTRIBUTE LAST ROWS -------------- 
+
+			if (world_rank != 1)
+				MPI_Recv(EXTRA_ROW_ABOVE, N, MPI_INT, world_rank - 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+			MPI_Send(Z[R-1], N, MPI_INT, world_rank % S + 1, 1, MPI_COMM_WORLD);
+
+			if (world_rank == 1) 
+				MPI_Recv(EXTRA_ROW_ABOVE, N, MPI_INT, S, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+		// -------------- DISTRIBUTE FIRST ROWS -------------- 
+
+			if (world_rank != S) 
+				MPI_Recv(EXTRA_ROW_BELOW, N, MPI_INT, world_rank + 1, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				
+			MPI_Send(Z[0], N, MPI_INT, (world_rank - 2 + S) % S + 1, 2, MPI_COMM_WORLD);
+
+			if (world_rank == S) 
+				MPI_Recv(EXTRA_ROW_BELOW, N, MPI_INT, 1, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		
+		// -------------- DENOISE - PROPOSE BIT FLIP -------------- 
 
 		    int i = rand() % R;
 		    int j = rand() % N;
