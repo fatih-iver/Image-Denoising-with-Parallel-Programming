@@ -67,7 +67,7 @@ int main(int argc, char** argv)
 			throw "Unable to Open Input File!";
 		}
 
-	// -------------- DISTRIBUTE DATA --------------
+	// -------------- DISTRIBUTE DATA - TO SLAVES --------------
 
 		for(int s = 0; s < S; s++)
 			for(int r = 0; r < R; r++) 
@@ -77,22 +77,20 @@ int main(int argc, char** argv)
 
     } else {
 
-	// -------------- COLLECT DATA --------------
+	// -------------- COLLECT DATA - FROM MASTER --------------
+		
+		int X[R][N];
+
+		for(int r = 0; r < R; r++)
+			MPI_Recv(X[r], N, MPI_INT, 0, r, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+	// -------------- DENOISE --------------
 
 		int Z[R][N];
 
 		for(int r = 0; r < R; r++)
-			MPI_Recv(Z[r], N, MPI_INT, 0, r, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    // -------------- -------------- --------------
-
-	}
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	/*if(world_rank != 0) {
-
-	// -------------- DENOISE --------------
+			for(int c = 0; c < N; c++)
+				Z[r][c] = X[r][c];
 
 		double beta = atof(argv[3]);
 
@@ -105,8 +103,8 @@ int main(int argc, char** argv)
 
 		for(long iteration_number = 1; iteration_number < iteration_limit; iteration_number++) {
 
-		    int i = rand() % 200;
-		    int j = rand() % 200;
+		    int i = rand() % R;
+		    int j = rand() % N;
 
 		    int neighbour_sum = 0;
 
@@ -117,7 +115,7 @@ int main(int argc, char** argv)
 		            int n_i = i + k;
 		            int n_j = j + l;
 
-		            if((n_i > -1 && n_i < 200) && (n_j > -1 && n_j < 200)) {
+		            if((n_i > -1 && n_i < R) && (n_j > -1 && n_j < N)) {
 
 		                if(!(n_i == i && n_j == j)) {
 		                    neighbour_sum += Z[n_i][n_j];
@@ -132,14 +130,26 @@ int main(int argc, char** argv)
 		    if ( ((double) rand() / (RAND_MAX)) < exp(delta_E) ) { Z[i][j] = -Z[i][j]; }
 		}
 
+    // -------------- DISTRIBUTE DATA - TO MASTER --------------	
+		
+		for(int r = 0; r < R; r++)
+			MPI_Send(Z[r], N, MPI_INT, 0, (world_rank-1)*R + r, MPI_COMM_WORLD);
+		
+
     // -------------- -------------- --------------
 
 	}
 
-	
 	MPI_Barrier(MPI_COMM_WORLD);
-
+	
 	if(world_rank == 0) {
+	
+	// -------------- COLLECT DATA - FROM SLAVES --------------
+		int Z[N][N];
+		
+		for(int s = 0; s < S; s++)
+			for(int r = 0; r < R; r++)
+				MPI_Recv(Z[s*R + r], N, MPI_INT, s+1, s*R + r, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	
 	// -------------- WRITE TO OUTPUT FILE --------------
 
@@ -147,9 +157,9 @@ int main(int argc, char** argv)
 
 		if (output_file.is_open()){
 
-		    for(int row = 0; row < 200; row++) {
+		    for(int row = 0; row < N; row++) {
 
-		        for(int column = 0; column < 200; column++) {
+		        for(int column = 0; column < N; column++) {
 		            output_file << Z[row][column] << " ";
 		        }
 
@@ -164,9 +174,12 @@ int main(int argc, char** argv)
 
     // -------------- -------------- --------------
 
-	} */
+	}
 
     // Finalize the MPI environment. No more MPI calls can be made after this
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
     MPI_Finalize();
 
     return 0;
