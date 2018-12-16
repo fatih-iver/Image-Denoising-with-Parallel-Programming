@@ -155,19 +155,22 @@ int main(int argc, char** argv)
 		        }
 
 		    }
+			
+			// -------------- DENOISE - CALCULATE PROBABILITY -------------- 
 
 		    double delta_E = -2 * gamma * Z[i][j] * X[i][j] - 2 * beta * Z[i][j] * neighbour_sum;
 
 		    if ( ((double) rand() / (RAND_MAX)) < exp(delta_E) ) { Z[i][j] = -Z[i][j]; }
+   			
+			// -------------- -------------- --------------
 		}
 
-    // -------------- DISTRIBUTE DATA - TO MASTER --------------	
+   		// -------------- DISTRIBUTE DATA - TO MASTER --------------	
 		
 		for(int r = 0; r < R; r++)
 			MPI_Send(Z[r], N, MPI_INT, 0, (world_rank-1)*R + r, MPI_COMM_WORLD);
 		
-
-    // -------------- -------------- --------------
+    	// -------------- -------------- --------------
 
 	}
 
@@ -175,14 +178,15 @@ int main(int argc, char** argv)
 	
 	if(world_rank == 0) {
 	
-	// -------------- COLLECT DATA - FROM SLAVES --------------
+		// -------------- COLLECT DATA - FROM SLAVES --------------
+		
 		int Z[N][N];
 		
 		for(int s = 0; s < S; s++)
 			for(int r = 0; r < R; r++)
 				MPI_Recv(Z[s*R + r], N, MPI_INT, s+1, s*R + r, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	
-	// -------------- WRITE TO OUTPUT FILE --------------
+		// -------------- WRITE TO OUTPUT FILE --------------
 
 		ofstream output_file(argv[2]);
 
