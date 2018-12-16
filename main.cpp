@@ -100,7 +100,7 @@ int main(int argc, char** argv)
 		double pi = atof(argv[4]);
 		double gamma = 0.5*log((1-pi)/pi);
 
-		long iteration_limit = 100000 / S;
+		long iteration_limit = 250000 / S;
 
 		srand(time(NULL));
 
@@ -140,12 +140,18 @@ int main(int argc, char** argv)
 		            int n_i = i + k;
 		            int n_j = j + l;
 
-		            if((n_i > -1 && n_i < R) && (n_j > -1 && n_j < N)) {
+					if(n_j > -1 && n_j < N) {
+					
+						if(n_i == -1) {
+							neighbour_sum += EXTRA_ROW_ABOVE[n_j];
+						} else if(n_i == R){
+							neighbour_sum += EXTRA_ROW_BELOW[n_j];
+						} else {
+							neighbour_sum += Z[n_i][n_j];
+						}
 
-		                if(!(n_i == i && n_j == j)) {
-		                    neighbour_sum += Z[n_i][n_j];
-		                }
-		            }
+					}
+
 		        }
 
 		    }
