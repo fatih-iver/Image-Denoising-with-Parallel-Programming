@@ -8,112 +8,166 @@
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
+#include <mpi.h>
 
 using namespace std;
 
-int main(int argc, char *argv[])
-{
-    int X[200][200];
+int main(int argc, char** argv)
+{	
 
-    // -------------- READ INPUT FILE --------------
+    MPI_Init(NULL, NULL);
 
-    ifstream input_file(argv[1]);
+    // Get the number of processes
+    int world_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    
+    // Get the rank of the process
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+	
+	int N = 200;
+	int S = world_size-1;
+	int R = N/S;
+	int C = N;
 
-    if (input_file.is_open()){
+    if(world_rank == 0){
+		
+	// -------------- PREPARE AN ARRAY TO BE FILLED --------------
 
-        int row = 0;
+		int** X = new int*[N];
+		for(int i = 0; i < N; i++) { X[i] = new int[N]; }	
 
-        string line;
 
-        while(getline(input_file, line)){
+	// -------------- READ INPUT FILE AND FILL THE PREPARED ARRAY --------------
 
-            int column = 0;
+	    ifstream input_file(argv[1]);
 
-            string element;
+	    if(input_file.is_open()){
 
-            istringstream iss(line);
+			int row = 0;
 
-            while(iss >> element) { X[row][column++] = atoi(element.c_str()); }
+			string line;
 
-            row++;
-        }
+			while(getline(input_file, line)){
 
-        input_file.close();
+				int column = 0;
 
-    } else
-        throw "Unable to Open Input File!";
+				string element;
+
+				istringstream iss(line);
+
+				while(iss >> element) { X[row][column++] = atoi(element.c_str()); }
+
+				row++;
+			}
+
+			input_file.close();
+
+	    } else {
+			throw "Unable to Open Input File!";
+		}
+
+	// -------------- DISTRIBUTE DATA --------------
+
+		for(int s = 0; s < S; s++)
+			for(int r = 0; r < R; r++) 
+ 				MPI_Send(X[s*R + r], N, MPI_INT, s+1, r, MPI_COMM_WORLD);
+				
+    // -------------- -------------- --------------
+
+    } else {
+
+	// -------------- COLLECT DATA --------------
+
+		int Z[R][N];
+
+		for(int r = 0; r < R; r++)
+			MPI_Recv(Z[r], N, MPI_INT, 0, r, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     // -------------- -------------- --------------
 
-    // -------------- DENOISE --------------
+	}
 
-    int Z[200][200];
+	MPI_Barrier(MPI_COMM_WORLD);
 
-    for(int row = 0; row < 200; row++) {
-        for(int column = 0; column < 200; column++) {
-            Z[row][column] = X[row][column];
-        }
-    }
+	/*if(world_rank != 0) {
 
-    double beta = atof(argv[3]);
+	// -------------- DENOISE --------------
 
-    double pi = atof(argv[4]);
-    double gamma = 0.5*log((1-pi)/pi);
+		double beta = atof(argv[3]);
 
-    long iteration_limit = 1000000;
+		double pi = atof(argv[4]);
+		double gamma = 0.5*log((1-pi)/pi);
 
-    srand(time(NULL));
+		long iteration_limit = 1000000;
 
-    for(long iteration_number = 1; iteration_number < iteration_limit; iteration_number++) {
+		srand(time(NULL));
 
-        int i = rand() % 200;
-        int j = rand() % 200;
+		for(long iteration_number = 1; iteration_number < iteration_limit; iteration_number++) {
 
-        int neighbour_sum = 0;
+		    int i = rand() % 200;
+		    int j = rand() % 200;
 
-        for(int k = -1 ; k <= 1; k++) {
+		    int neighbour_sum = 0;
 
-            for(int l = -1; l <= 1; l++) {
+		    for(int k = -1 ; k <= 1; k++) {
 
-                int n_i = i + k;
-                int n_j = j + l;
+		        for(int l = -1; l <= 1; l++) {
 
-                if((n_i > -1 && n_i < 200) && (n_j > -1 && n_j < 200)) {
+		            int n_i = i + k;
+		            int n_j = j + l;
 
-                    if(!(n_i == i && n_j == j)) {
-                        neighbour_sum += Z[n_i][n_j];
-                    }
-                }
-            }
+		            if((n_i > -1 && n_i < 200) && (n_j > -1 && n_j < 200)) {
 
-        }
+		                if(!(n_i == i && n_j == j)) {
+		                    neighbour_sum += Z[n_i][n_j];
+		                }
+		            }
+		        }
 
-        double delta_E = -2 * gamma * Z[i][j] * X[i][j] - 2 * beta * Z[i][j] * neighbour_sum;
+		    }
 
-        if ( ((double) rand() / (RAND_MAX)) < exp(delta_E) ) { Z[i][j] = -Z[i][j]; }
-    }
+		    double delta_E = -2 * gamma * Z[i][j] * X[i][j] - 2 * beta * Z[i][j] * neighbour_sum;
 
-    // -------------- WRITE TO OUTPUT FILE --------------
-
-    ofstream output_file(argv[2]);
-
-    if (output_file.is_open()){
-
-        for(int row = 0; row < 200; row++) {
-
-            for(int column = 0; column < 200; column++) {
-                output_file << Z[row][column] << " ";
-            }
-
-            output_file << "\n";
-        }
-
-        output_file.close();
-
-    } else
-        throw "Unable to Open Output File!";
+		    if ( ((double) rand() / (RAND_MAX)) < exp(delta_E) ) { Z[i][j] = -Z[i][j]; }
+		}
 
     // -------------- -------------- --------------
+
+	}
+
+	
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	if(world_rank == 0) {
+	
+	// -------------- WRITE TO OUTPUT FILE --------------
+
+		ofstream output_file(argv[2]);
+
+		if (output_file.is_open()){
+
+		    for(int row = 0; row < 200; row++) {
+
+		        for(int column = 0; column < 200; column++) {
+		            output_file << Z[row][column] << " ";
+		        }
+
+		        output_file << "\n";
+		    }
+
+		    output_file.close();
+
+		} else {
+		    throw "Unable to Open Output File!";
+		}
+
+    // -------------- -------------- --------------
+
+	} */
+
+    // Finalize the MPI environment. No more MPI calls can be made after this
+    MPI_Finalize();
 
     return 0;
 }
