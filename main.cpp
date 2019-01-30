@@ -1,3 +1,11 @@
+/*
+Student Name: Fatih İver
+Student Number: 2016400264
+Compile Status: Compiling
+Program Status: Working
+Notes: I was very confused in the beginning, but now it is so clear. Thanks for this project. 
+*/
+
 #include <iostream>
 #include <fstream>
 #include <string>
