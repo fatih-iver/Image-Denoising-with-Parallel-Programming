@@ -1,0 +1,5 @@
+mpicc -g your_code.c -o your_program
+
+mpiexec -n NUM_PROCESSORS ./your_program
+
+mpiexec -n 4 project.exe input.txt output.txt 0.6 0.1
